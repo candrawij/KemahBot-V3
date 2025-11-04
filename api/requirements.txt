@@ -1,0 +1,11 @@
+# Server & API
+fastapi
+uvicorn
+gunicorn  # Server produksi (PENTING untuk deploy)
+
+# VSM & Logika
+pandas
+scikit-learn
+nltk
+joblib
+Sastrawi
