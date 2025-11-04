@@ -80,7 +80,7 @@ HASIL TESTING STKI TUGAS AKHIR
 
 **3.0**
 - SUDAH JADI BOT
-- hasil sudah cukup bagus
+- hasil sudah lumayan bagus
 
 # memberikan hanya 3 terbaik dari semua list, tidak bisa menggunakan pencarian ALL
 # per pencarian masih satu konteks, tidak bisa pencairan satu tentang tempat A lalu pencarian dua "berikan info lebih lengkapnya" tanpa memberi konteks ulang di tempat A
