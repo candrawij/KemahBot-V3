@@ -12,9 +12,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 4. Salin SEMUA file proyek Anda (skrip .py, folder Assets, folder Kamus)
 COPY . .
 
-# 5. Beri tahu HF port berapa yang akan digunakan aplikasi Anda
-EXPOSE 8000
-
-# 6. Perintah untuk menjalankan aplikasi saat container dimulai
+# 5. Perintah untuk menjalankan aplikasi saat container dimulai
 # Kita gunakan gunicorn (server produksi) untuk menjalankan app.py (yang dulu main.py)
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app:app", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "app:app", "--bind", "0.0.0.0:7860"]
