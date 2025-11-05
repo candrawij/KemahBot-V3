@@ -85,6 +85,10 @@ HASIL TESTING STKI TUGAS AKHIR
 # memberikan hanya 3 terbaik dari semua list, tidak bisa menggunakan pencarian ALL
 # per pencarian masih satu konteks, tidak bisa pencairan satu tentang tempat A lalu pencarian dua "berikan info lebih lengkapnya" tanpa memberi konteks ulang di tempat A
 
+3.0.1
+- persiapan deploy
+- deploy menggunakan HuggingFace, memuat API project untuk dijalankan di HF dan digunakan di orchestrator.py
+
 
 RENCANA
 - pembuatan website

@@ -13,6 +13,7 @@ uvicorn[standard] # Server untuk FastAPI
 streamlit
 
 # === Dependensi Chatbot (Fase 2) ===
+streamlit
 google-generativeai # Untuk Gemini LLM
 httpx               # Untuk memanggil API kita dari Python
 python-dotenv       # Untuk membaca file .env
