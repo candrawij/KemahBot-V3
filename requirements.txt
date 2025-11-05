@@ -1,19 +1,4 @@
-# === Dependensi VSM (dari file lama) ===
-pandas
-scikit-learn
-nltk
-joblib
-Sastrawi
-
-# === Dependensi API Baru (Fase 1) ===
-fastapi
-uvicorn[standard] # Server untuk FastAPI
-
-# === Dependensi UI Baru (Fase 3) ===
 streamlit
-
-# === Dependensi Chatbot (Fase 2) ===
-streamlit
-google-generativeai # Untuk Gemini LLM
-httpx               # Untuk memanggil API kita dari Python
-python-dotenv       # Untuk membaca file .env
+google-generativeai
+httpx
+python-dotenv
