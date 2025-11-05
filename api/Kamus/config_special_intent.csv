@@ -1,0 +1,17 @@
+intent_phrase,intent_code
+tempat kemah terbaik,RATING_TOP
+paling bagus,RATING_TOP
+paling recommended,RATING_TOP
+rating tertinggi,RATING_TOP
+tempat kemah terburuk,RATING_BOTTOM
+paling jelek,RATING_BOTTOM
+rating terendah,RATING_BOTTOM
+semua tempat kemah,ALL
+tampilkan semua,ALL
+berikan semua,ALL
+tidak direkomendasikan,RATING_BOTTOM
+tempat kemah jelek,RATING_BOTTOM
+tidak cocok,RATING_BOTTOM
+tidak sesuai,RATING_BOTTOM
+worth it,RATING_TOP
+tidak worth it,RATING_BOTTOM

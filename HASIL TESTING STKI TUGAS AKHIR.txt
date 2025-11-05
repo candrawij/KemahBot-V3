@@ -89,6 +89,9 @@ HASIL TESTING STKI TUGAS AKHIR
 - persiapan deploy
 - deploy menggunakan HuggingFace, memuat API project untuk dijalankan di HF dan digunakan di orchestrator.py
 
+3.0.2
+- penyesuaian deploy
+
 
 RENCANA
 - pembuatan website
