@@ -91,6 +91,7 @@ HASIL TESTING STKI TUGAS AKHIR
 
 3.0.2
 - penyesuaian deploy
+- penghapusan venv dari Git
 
 
 RENCANA
