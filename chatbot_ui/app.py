@@ -1,13 +1,20 @@
 import streamlit as st
 import os
+import sys
 
 # --- Impor "Otak" (Orchestrator) ---
-# Kita asumsikan orchestrator.py ada di folder yang sama
+# Pastikan folder ini masuk ke Python path
+CURRENT_DIR = os.path.dirname(__file__)
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
+# --- Impor "Otak" (Orchestrator) ---
 try:
     from orchestrator import get_chatbot_reply
-except ImportError:
-    st.error("❌ Gagal memuat 'orchestrator.py'. Pastikan file tersebut ada di folder 'chatbot_ui'.")
+except Exception as e:
+    st.error(f"❌ Gagal memuat 'orchestrator.py': {e}")
     st.stop()
+
 
 # =====================================================================
 # 1. KONFIGURASI HALAMAN & CSS

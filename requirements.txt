@@ -1,4 +1,4 @@
 streamlit
-google-generativeai
 httpx
 python-dotenv
+google-generativeai
