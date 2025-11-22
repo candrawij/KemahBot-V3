@@ -1,5 +1,5 @@
 import os
-import httpx  # Library modern untuk memanggil API, pengganti 'requests'
+import httpx
 import json
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -8,213 +8,192 @@ from dotenv import load_dotenv
 # 1. KONFIGURASI MODEL LLM (GEMINI)
 # =====================================================================
 
-# Muat API key dari file .env yang ada di folder *utama* proyek
-# Kita perlu .. untuk "naik" satu level dari chatbot_ui/ ke CampGround Bot/
 try:
     dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
     load_dotenv(dotenv_path)
-    
+
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY tidak ditemukan. Pastikan ada di file .env di folder utama.")
-        
+        raise ValueError("GEMINI_API_KEY tidak ditemukan di .env")
+
     genai.configure(api_key=GEMINI_API_KEY)
-    
-    # Atur model Gemini yang akan kita gunakan
+
     generation_config = {
-      "temperature": 0.7,
-      "top_p": 1,
-      "top_k": 1,
-      "max_output_tokens": 2048,
+        "temperature": 0.6,
+        "top_p": 1,
+        "top_k": 1,
+        "max_output_tokens": 2048,
     }
-    model = genai.GenerativeModel(model_name="models/gemini-2.5-flash",
-                                  generation_config=generation_config)
-    print("✅ Orchestrator: Model Generatif Gemini (LLM) siap.")
+
+    model = genai.GenerativeModel(
+        model_name="models/gemini-2.5-flash",
+        generation_config=generation_config
+    )
+
+    print("✅ Orchestrator: Gemini siap digunakan.")
 
 except Exception as e:
-    print(f"❌ ERROR: Gagal mengkonfigurasi Gemini. {e}")
+    print(f"❌ ERROR LLM: {e}")
     model = None
 
-# URL tempat API FastAPI (Fase 1) Anda berjalan
+# API HuggingFace Anda
 RETRIEVAL_API_URL = "https://Kaira21-campground-api.hf.space/search"
 
+
 # =====================================================================
-# FUNGSI 1: PANGGIL LLM (Ekstraksi Keyword)
+# 2. NORMALISASI / FILTER DATA KONTEXT
+# =====================================================================
+def simplify_context(context_list: list) -> list:
+    """
+    Mengubah raw JSON hasil API (yang sangat besar)
+    menjadi format ringkas agar aman diberikan ke LLM.
+    """
+    cleaned = []
+
+    for item in context_list:
+        try:
+            harga_termurah = None
+            if item.get("Price_Items"):
+                harga_termurah = min(
+                    p.get("harga", 0) for p in item["Price_Items"]
+                )
+
+            cleaned.append({
+                "nama": item.get("Nama_Tempat"),
+                "lokasi": item.get("Lokasi"),
+                "rating": item.get("Avg_Rating"),
+                "fasilitas": item.get("Facilities"),
+                "harga_termurah": harga_termurah,
+            })
+        except Exception:
+            continue
+
+    return cleaned
+
+
+# =====================================================================
+# 3. LLM – Ekstraksi keyword dari user_query
 # =====================================================================
 def extract_keywords_from_query(user_query: str) -> str:
-    """
-    Menggunakan LLM (Call #1) untuk mengekstrak keyword VSM 
-    dari pertanyaan bahasa alami pengguna.
-    """
-    if not model: return user_query # Fallback jika LLM gagal
+    if not model:
+        return user_query.lower()
 
     prompt = f"""
-    Anda adalah asisten SEO yang sangat efisien. 
-    Ekstrak HANYA keyword PENTING (kata kunci) untuk mesin pencari VSM dari pertanyaan pengguna berikut.
-    Fokus pada lokasi, fasilitas, atau suasana (misal: 'sejuk', 'kamar mandi bersih', 'anak').
-    JANGAN JAWAB pertanyaannya.
-    JANGAN tambahkan kata-kata pembuka atau "keyword:".
-    Jawab HANYA dengan keyword yang dipisahkan spasi.
-    Jika tidak ada keyword relevan, kembalikan 'kemah'.
+    Ekstrak HANYA keyword penting dari pertanyaan berikut.
+    Jangan tambahkan kata lain.
+    Jawab hanya keyword dipisahkan spasi.
 
-    Contoh:
-    Pertanyaan: "Halo, saya mau cari tempat kemah yang sejuk di Jogja dan ada WiFi-nya."
-    Jawaban: "sejuk jogja wifi"
-    
-    Pertanyaan: "tempat camping di semarang yang boleh bawa anjing"
-    Jawaban: "semarang bawa anjing"
-    
-    Pertanyaan: "ada rekomendasi?"
-    Jawaban: "kemah"
-
-    ---
     Pertanyaan: "{user_query}"
-    Jawaban:
+    Keyword:
     """
-    
+
     try:
         response = model.generate_content(prompt)
         keywords = response.text.strip().lower()
-        print(f"INFO (LLM-1): Keyword diekstrak: '{keywords}'")
+        print(f"[LLM-1] Keyword diekstrak → {keywords}")
         return keywords
     except Exception as e:
-        print(f"ERROR (LLM-1): Gagal ekstraksi keyword: {e}")
-        return user_query.lower() # Fallback: gunakan query asli
+        print(f"[LLM-1] ERROR: {e}")
+        return user_query.lower()
+
 
 # =====================================================================
-# FUNGSI 2: PANGGIL API FASE 1 (Retrieval & Augmentation)
+# 4. CALL API – Ambil data context hasil VSM
 # =====================================================================
 def get_retrieval_context(keywords: str) -> list:
-    """
-    Memanggil API FastAPI (Fase 1) kita untuk mendapatkan data 
-    kontekstual (hasil VSM + metadata).
-    """
     payload = {"query": keywords}
-    
+
     try:
-        # Kita gunakan httpx.post untuk memanggil API kita
         with httpx.Client(timeout=30.0) as client:
             response = client.post(RETRIEVAL_API_URL, json=payload)
-            
-            # Cek jika API merespons dengan sukses (200 OK)
-            if response.status_code == 200:
-                context_data = response.json()
-                print(f"INFO (API-Call): Berhasil mengambil {len(context_data)} data konteks.")
-                return context_data
-            else:
-                print(f"ERROR (API-Call): API Fase 1 mengembalikan error {response.status_code} - {response.text}")
+
+        if response.status_code == 200:
+            context = response.json()
+
+            # Context harus list
+            if not isinstance(context, list):
+                print(f"[API] WARNING: Response bukan list → {context}")
                 return []
-                
-    except httpx.ConnectError as e:
-        print(f"❌ ERROR (API-Call): Gagal terhubung ke API Fase 1 di {RETRIEVAL_API_URL}.")
-        print("   Pastikan server FastAPI (Fase 1) Anda sedang berjalan di terminal lain!")
-        return []
+
+            print(f"[API] Berhasil ambil {len(context)} data")
+            return context
+        else:
+            print(f"[API] ERROR {response.status_code}: {response.text}")
+            return []
     except Exception as e:
-        print(f"ERROR (API-Call): Error tidak diketahui: {e}")
+        print(f"[API] ERROR koneksi: {e}")
         return []
 
+
 # =====================================================================
-# FUNGSI 3: PANGGIL LLM (Generasi Jawaban RAG)
+# 5. LLM – Membuat jawaban final (RAG)
 # =====================================================================
-def generate_augmented_response(user_query: str, context: list) -> str:
-    """
-    Menggunakan LLM (Call #2) untuk menghasilkan jawaban bahasa alami
-    berdasarkan data konteks (dari API) dan pertanyaan asli.
-    """
-    if not model: return "Maaf, model AI sedang bermasalah."
+def generate_augmented_response(user_query: str, raw_context: list) -> str:
+    if not model:
+        return "Maaf, model AI tidak tersedia."
+
+    if not raw_context:
+        return (
+            "Maaf, saya tidak menemukan tempat kemah yang cocok "
+            "dengan kriteria Anda. Coba ubah kata kunci lain."
+        )
+
+    # Ringankan konteks
+    context = simplify_context(raw_context)
+
     if not context:
-        return "Maaf, saya sudah mencari tapi tidak menemukan tempat kemah yang cocok dengan kriteria Anda. Coba gunakan kata kunci lain."
+        return "Maaf, data konteks tidak valid."
 
-    # Ubah data konteks (list of dicts) menjadi string JSON
-    # Ini cara termudah agar LLM bisa membacanya
-    try:
-        context_json_string = json.dumps(context, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"ERROR: Gagal mengubah konteks ke JSON: {e}")
-        return "Maaf, terjadi error saat memproses data."
+    context_json = json.dumps(context, indent=2, ensure_ascii=False)
 
     prompt = f"""
-    Anda adalah "KemahBot", asisten travel ahli tempat kemah di Jawa Tengah & DIY.
-    Tugas Anda adalah menjawab pertanyaan pengguna secara ramah dan membantu, HANYA berdasarkan KONTEKS DATA di bawah ini.
-    JANGAN gunakan pengetahuan lain di luar konteks.
-    JANGAN mengarang informasi.
-    
-    Saat menjawab:
-    - Sapa pengguna dan jawab pertanyaannya secara langsung.
-    - Sebutkan 1-3 tempat kemah terbaik dari konteks.
-    - Berikan alasan singkat mengapa tempat itu direkomendasikan (misal: rating, fasilitas utama, atau harga jika relevan).
-    - Jawab dalam bahasa Indonesia yang alami dan informatif.
+    Anda adalah KemahBot, asisten rekomendasi tempat kemah di Jawa Tengah & DIY.
 
-    ---
-    KONTEKS DATA (dari API VSM):
-    {context_json_string}
-    ---
+    Gunakan HANYA data berikut (sudah diringkas aman):
 
-    PERTANYAAN PENGGUNA:
+    DATA:
+    {context_json}
+
+    Instruksi:
+    - Jawab secara ramah dan langsung.
+    - Berikan 1–3 rekomendasi terbaik dengan alasan (rating, fasilitas, harga).
+    - Jangan gunakan pengetahuan di luar data.
+
+    Pertanyaan Pengguna:
     {user_query}
-    ---
 
-    JAWABAN ANDA:
+    Jawaban:
     """
 
     try:
         response = model.generate_content(prompt)
-        print(f"INFO (LLM-2): Jawaban RAG berhasil dibuat.")
-        return response.text
+        print("[LLM-2] Jawaban berhasil dibuat.")
+        return response.text.strip()
     except Exception as e:
-        print(f"ERROR (LLM-2): Gagal generasi jawaban: {e}")
-        return "Maaf, terjadi kesalahan saat saya mencoba merangkum jawaban."
+        print(f"[LLM-2] ERROR: {e}")
+        return "Maaf, terjadi kesalahan saat membuat jawaban."
+
 
 # =====================================================================
-# FUNGSI 4: ORKESTRATOR UTAMA
+# 6. FUNGSI UTAMA UNTUK STREAMLIT
 # =====================================================================
 def get_chatbot_reply(user_input: str) -> str:
-    """
-    Fungsi utama yang mengelola seluruh alur RAG.
-    Ini yang akan dipanggil oleh Streamlit (Fase 3).
-    """
-    print(f"\n==========================\n🔄 Memproses query: '{user_input}'")
-    
-    # 1. Ekstraksi Keyword
+    print("\n==============================")
+    print(f"🔍 Query masuk → {user_input}")
+
     keywords = extract_keywords_from_query(user_input)
-    
-    # 2. Retrieval (Panggil API Fase 1)
-    context_data = get_retrieval_context(keywords)
-    
-    # 3. Generation (Panggil LLM Fase 2)
-    final_answer = generate_augmented_response(user_input, context_data)
-    
-    print(f"💬 Jawaban Final: {final_answer[:100]}...")
-    return final_answer
+    context = get_retrieval_context(keywords)
+    answer = generate_augmented_response(user_input, context)
+
+    print(f"💬 Final Answer: {answer[:80]}...")
+    return answer
+
 
 # =====================================================================
-# BLOK UJI COBA LANGSUNG
+# 7. MODE DEBUG / TESTING
 # =====================================================================
 if __name__ == "__main__":
-    """
-    Ini memungkinkan kita menguji file orchestrator.py ini langsung 
-    dari terminal, SEBELUM membuat UI Streamlit.
-    
-    Cara menjalankan:
-    1. Pastikan API Fase 1 (uvicorn) berjalan di terminal 1.
-    2. Buka terminal 2, aktifkan venv, masuk ke folder 'chatbot_ui'.
-    3. Jalankan: python orchestrator.py
-    """
-    
-    print("--- [Mode Uji Coba Orchestrator] ---")
-    print("   Pastikan API Fase 1 Anda (uvicorn) sedang berjalan!")
-    
-    # Contoh pertanyaan untuk diuji
-    test_query_1 = "Halo, saya mau cari tempat kemah yang sejuk di Jogja dan ada WiFi-nya."
-    test_query_2 = "cariin kemah di semarang dong"
-    test_query_3 = "yang ada kolam renangnya"
+    print("--- MODE TEST ORCHESTRATOR ---")
 
-    # --- Uji Coba 1 ---
-    balasan = get_chatbot_reply(test_query_1)
-    print("\n--- HASIL UJI COBA 1 ---")
-    print(balasan)
-    
-    # --- Uji Coba 2 ---
-    balasan_2 = get_chatbot_reply(test_query_2)
-    print("\n--- HASIL UJI COBA 2 ---")
-    print(balasan_2)
+    tanya = "Halo, saya mau cari tempat kemah yang sejuk di Jogja dan ada wifi"
+    print(get_chatbot_reply(tanya))
