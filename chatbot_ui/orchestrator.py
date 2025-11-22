@@ -36,7 +36,7 @@ except Exception as e:
     model = None
 
 # URL tempat API FastAPI (Fase 1) Anda berjalan
-RETRIEVAL_API_URL = "https://kaira21-campground-api.hf.space/docs#/default/search_kemah_search_post"
+RETRIEVAL_API_URL = "https://Kaira21-campground-api.hf.space/search"
 
 # =====================================================================
 # FUNGSI 1: PANGGIL LLM (Ekstraksi Keyword)
